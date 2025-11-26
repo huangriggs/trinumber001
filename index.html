@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三角數圖形規律互動展示</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 使用 Inter 字體以獲得更好的視覺效果 */
+        :root {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* 自定義點點的樣式 */
+        .dot {
+            width: 20px;
+            height: 20px;
+            /* 模仿圖片中的紅棕色調 */
+            background-color: #925C4B;
+            border-radius: 50%;
+            margin: 4px; /* 點點之間的間距 */
+            flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.1s ease-out;
+        }
+
+        /* 點點容器的樣式，用於模擬圖片中的粉色背景 */
+        .visualization-container {
+            min-height: 250px;
+            background-color: #F8E8E9; /* 柔和的粉色背景 */
+            padding: 24px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            user-select: none; /* 防止在觸控裝置上拖曳時選取文字 */
+        }
+
+        /* 每個點點排列的行 */
+        .dot-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 4px; /* 行之間的間距 */
+        }
+
+        /* 滑桿美化 (針對 WebKit/Blink 核心瀏覽器，如 Chrome/Safari/iPad) */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            outline: none;
+            transition: opacity .2s;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #925C4B; /* 與點點顏色一致 */
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type=range]:focus::-webkit-slider-thumb {
+            box-shadow: 0 0 0 4px rgba(146, 92, 75, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 sm:p-8 flex items-start justify-center">
+
+    <div class="w-full max-w-2xl bg-white p-6 sm:p-8 rounded-xl shadow-2xl border border-gray-100">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2 text-center">
+            三角數規律互動學習
+        </h1>
+        <p class="text-center text-gray-500 mb-6">
+            拖曳下方滑桿，觀察第 $n$ 個圖形所需的點數。
+        </p>
+
+        <!-- 輸出結果區塊 -->
+        <div class="mb-6 bg-indigo-50 p-4 rounded-lg flex items-center justify-between shadow-inner">
+            <div class="text-left">
+                <p class="text-sm font-medium text-indigo-700">目前圖形編號 (n)</p>
+                <p id="indexDisplay" class="text-3xl font-extrabold text-indigo-900">1</p>
+            </div>
+            <div class="text-right">
+                <p class="text-sm font-medium text-indigo-700">總點數 (T_n)</p>
+                <p id="countDisplay" class="text-3xl font-extrabold text-indigo-900">1 個</p>
+            </div>
+        </div>
+
+        <!-- 點點圖形展示區 -->
+        <div id="dotVisualization" class="visualization-container">
+            <!-- 點點將由 JavaScript 動態生成 -->
+        </div>
+
+        <!-- 滑桿控制區 -->
+        <div class="mt-8">
+            <label for="patternSlider" class="block text-lg font-semibold text-gray-700 mb-4">
+                圖形編號選擇器 (n = 1 到 15)
+            </label>
+            <input type="range" id="patternSlider" min="1" max="15" value="1" step="1">
+            <div class="flex justify-between text-sm text-gray-500 mt-1">
+                <span>n=1</span>
+                <span>n=15</span>
+            </div>
+        </div>
+
+        <!-- 數學公式提示 -->
+        <div class="mt-8 pt-4 border-t border-gray-200">
+            <h3 class="text-xl font-semibold text-gray-700 mb-2">規律提示 (老師參考)</h3>
+            <p class="text-gray-600 text-sm">
+                此規律為三角數 (Triangular Numbers)。
+            </p>
+            <p class="text-gray-600 text-sm mt-1">
+                第 $n$ 個圖形的總點數 $T_n$ 可由公式計算：
+            </p>
+            <div class="bg-gray-100 p-3 rounded-lg mt-2 text-center">
+                <span class="text-base font-mono text-gray-800">
+                    $$T_n = 1 + 2 + 3 + ... + n = \frac{n(n+1)}{2}$$
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM 元素引用
+        const slider = document.getElementById('patternSlider');
+        const visualizationContainer = document.getElementById('dotVisualization');
+        const countDisplay = document.getElementById('countDisplay');
+        const indexDisplay = document.getElementById('indexDisplay');
+
+        /**
+         * 根據圖形編號 (n) 計算三角數 (總點數 Tn)。
+         * T_n = n * (n + 1) / 2
+         * @param {number} n 圖形編號
+         * @returns {number} 總點數
+         */
+        function calculateTriangularNumber(n) {
+            return n * (n + 1) / 2;
+        }
+
+        /**
+         * 產生點點的視覺化排列。
+         * @param {number} n 圖形編號
+         */
+        function renderDots(n) {
+            // 清空舊的內容
+            visualizationContainer.innerHTML = '';
+            
+            // 如果 n=0 則顯示問號 (在我們的設計中 n從1開始)
+            if (n < 1) {
+                 visualizationContainer.innerHTML = '<span class="text-4xl text-gray-400">請選擇 n &ge; 1</span>';
+                 return;
+            }
+
+            // 動態創建點點並以三角形排列
+            for (let i = 1; i <= n; i++) {
+                const row = document.createElement('div');
+                row.className = 'dot-row'; // 確保每行居中
+                
+                // 每一行有 i 個點
+                for (let j = 0; j < i; j++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'dot';
+                    row.appendChild(dot);
+                }
+                
+                visualizationContainer.appendChild(row);
+            }
+        }
+
+        /**
+         * 處理滑桿值變化的主要邏輯。
+         */
+        function updateVisualization() {
+            // 將滑桿的值轉換為數字 n (圖形編號)
+            const n = parseInt(slider.value, 10);
+            
+            // 1. 計算總點數 T_n
+            const tn = calculateTriangularNumber(n);
+            
+            // 2. 更新文字顯示
+            indexDisplay.textContent = n;
+            countDisplay.textContent = `${tn} 個`;
+            
+            // 3. 重新繪製圖形
+            renderDots(n);
+        }
+
+        // --- 初始化與事件監聽 ---
+
+        // 綁定滑桿的 input 和 change 事件，以支援即時拖曳和觸控裝置
+        slider.addEventListener('input', updateVisualization);
+        slider.addEventListener('change', updateVisualization);
+        
+        // 頁面載入時執行一次，以顯示初始狀態 (n=1)
+        window.onload = updateVisualization;
+
+    </script>
+</body>
+</html>
